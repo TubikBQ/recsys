@@ -105,3 +105,10 @@ def evaluate(model, ts, gt, k=10, batch=1024):
         "Coverage@10": len(recommended) / ts.n_items,
         "n_users": len(users),
     }
+
+
+def rating_arrays(ts, part):
+    """Оценки из part для известных пользователей и объектов: индексы, день, оценка."""
+    k = part[part["user_id"].isin(ts.user2idx.index) & part["item_id"].isin(ts.item2idx.index)]
+    return (ts.user2idx.loc[k["user_id"]].to_numpy(), ts.item2idx.loc[k["item_id"]].to_numpy(),
+            k["day"].to_numpy(dtype=np.float32), k["rating"].to_numpy(dtype=np.float32))

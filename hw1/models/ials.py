@@ -2,26 +2,22 @@ import numpy as np
 import scipy.sparse as sp
 
 
-def _solve_side(R_pref, R_conf, Y, reg, chunk=400):
-    """Для каждой строки решает (Y^T C Y + reg I) x = Y^T C p,
+def _solve_side(R_pref, R_conf, Y, reg):
+    """Для каждой строки решает (Y^T Y + Y^T (C - I) Y + reg I) x = Y^T C p,
     где C = 1 + (c - 1) на наблюдаемых, p = 0 на ненаблюдаемых."""
     n, k = R_pref.shape[0], Y.shape[1]
     YtY = Y.T @ Y + reg * np.eye(k)
     out = np.zeros((n, k))
     indptr, indices = R_conf.indptr, R_conf.indices
-    for s in range(0, n, chunk):
-        e = min(n, s + chunk)
-        a, b = indptr[s], indptr[e]
-        idx = indices[a:b]
-        cm1 = R_conf.data[a:b] - 1.0
-        cp = R_conf.data[a:b] * R_pref.data[a:b]
-        Yi = Y[idx]
-        lens = np.diff(indptr[s:e + 1])
-        starts = np.minimum(indptr[s:e] - a, max(b - a - 1, 0))
-        outer = cm1[:, None, None] * Yi[:, :, None] * Yi[:, None, :]
-        A = YtY[None] + np.add.reduceat(outer, starts, axis=0) * (lens > 0)[:, None, None]
-        rhs = np.add.reduceat(cp[:, None] * Yi, starts, axis=0) * (lens > 0)[:, None]
-        out[s:e] = np.linalg.solve(A, rhs[:, :, None])[:, :, 0]
+    conf, pref = R_conf.data, R_pref.data
+    for r in range(n):
+        s, e = indptr[r], indptr[r + 1]
+        if s == e:
+            continue
+        Yi = Y[indices[s:e]]
+        c = conf[s:e]
+        A = YtY + (Yi.T * (c - 1.0)) @ Yi
+        out[r] = np.linalg.solve(A, Yi.T @ (c * pref[s:e]))
     return out
 
 
